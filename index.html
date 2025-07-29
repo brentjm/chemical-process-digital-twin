@@ -3,7 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <title>Chemical Process Digital Twin</title>
-  <style>body { margin: 0; }</style>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+    }
+    #startBtn {
+      padding: 15px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .start { background-color: #4CAF50; color: white; }
+    .stop { background-color: #f44336; color: white; }
+    #drawer {
+      position: absolute;
+      bottom: -400px;
+      left: 0;
+      width: 100%;
+      height: 400px;
+      background: rgba(128, 128, 128, 0.8);
+      backdrop-filter: blur(5px);
+      transition: bottom 0.5s ease;
+      z-index: 90;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      gap: 20px;
+    }
+    #drawer.open {
+      bottom: 0;
+    }
+    .chart-container {
+      flex: 1;
+      background: rgba(169, 169, 169, 0.6);
+      border-radius: 10px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-title {
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    canvas { 
+      flex: 1;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+    }
+  </style>
   <script type="importmap">
     {
       "imports": {
@@ -13,6 +70,20 @@
   </script>
 </head>
 <body>
+  <div id="ui">
+    <button id="startBtn" class="start">START</button>
+  </div>
+  <div id="drawer">
+    <div class="chart-container">
+      <div class="chart-title">Temperature & Composition</div>
+      <canvas id="tempCompCanvas" width="400" height="280"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Pressure</div>
+      <canvas id="pressureCanvas" width="400" height="280"></canvas>
+    </div>
+  </div>
+
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js';
@@ -44,12 +115,196 @@
     const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
     scene.add(ambientLight);
 
+    // Process control variables
+    let isProcessRunning = false;
+    let processData = {
+      temperature: [],
+      composition: [],
+      pressure: [],
+      time: []
+    };
+    let dataInterval;
+
+    // UI Elements
+    const startBtn = document.getElementById('startBtn');
+    const drawer = document.getElementById('drawer');
+    const tempCompCanvas = document.getElementById('tempCompCanvas');
+    const pressureCanvas = document.getElementById('pressureCanvas');
+    const tempCompCtx = tempCompCanvas.getContext('2d');
+    const pressureCtx = pressureCanvas.getContext('2d');
+
+    // Button click handler
+    startBtn.addEventListener('click', function() {
+      if (!isProcessRunning) {
+        startProcess();
+      } else {
+        stopProcess();
+      }
+    });
+
+    function startProcess() {
+      isProcessRunning = true;
+      startBtn.textContent = 'STOP';
+      startBtn.className = 'stop';
+      drawer.classList.add('open');
+      
+      // Reset data
+      processData.temperature = [];
+      processData.composition = [];
+      processData.pressure = [];
+      processData.time = [];
+      
+      // Start data generation
+      dataInterval = setInterval(generateData, 500);
+    }
+
+    function stopProcess() {
+      isProcessRunning = false;
+      startBtn.textContent = 'START';
+      startBtn.className = 'start';
+      drawer.classList.remove('open');
+      
+      if (dataInterval) {
+        clearInterval(dataInterval);
+      }
+    }
+
+    function generateData() {
+      const currentTime = processData.time.length;
+      
+      // Generate realistic process data with some noise
+      const baseTemp = 350 + Math.sin(currentTime * 0.1) * 20 + (Math.random() - 0.5) * 10;
+      const baseComp = 0.75 + Math.sin(currentTime * 0.15) * 0.15 + (Math.random() - 0.5) * 0.05;
+      const basePressure = 2.5 + Math.sin(currentTime * 0.08) * 0.5 + (Math.random() - 0.5) * 0.2;
+      
+      processData.temperature.push(baseTemp);
+      processData.composition.push(Math.max(0, Math.min(1, baseComp)));
+      processData.pressure.push(Math.max(0, basePressure));
+      processData.time.push(currentTime);
+      
+      // Keep only last 50 data points
+      if (processData.time.length > 50) {
+        processData.temperature.shift();
+        processData.composition.shift();
+        processData.pressure.shift();
+        processData.time.shift();
+      }
+      
+      drawTempCompChart();
+      drawPressureChart();
+    }
+
+    function drawTempCompChart() {
+      tempCompCtx.clearRect(0, 0, tempCompCanvas.width, tempCompCanvas.height);
+      
+      if (processData.time.length === 0) return;
+      
+      const margin = 40;
+      const chartWidth = tempCompCanvas.width - 2 * margin;
+      const chartHeight = tempCompCanvas.height - 2 * margin;
+      
+      // Draw axes
+      tempCompCtx.strokeStyle = '#fff';
+      tempCompCtx.lineWidth = 1;
+      tempCompCtx.beginPath();
+      tempCompCtx.moveTo(margin, margin);
+      tempCompCtx.lineTo(margin, tempCompCanvas.height - margin);
+      tempCompCtx.lineTo(tempCompCanvas.width - margin, tempCompCanvas.height - margin);
+      tempCompCtx.stroke();
+      
+      // Draw temperature curve (red)
+      if (processData.temperature.length > 1) {
+        tempCompCtx.strokeStyle = '#ff4444';
+        tempCompCtx.lineWidth = 2;
+        tempCompCtx.beginPath();
+        
+        for (let i = 0; i < processData.temperature.length; i++) {
+          const x = margin + (i / (processData.temperature.length - 1)) * chartWidth;
+          const y = tempCompCanvas.height - margin - ((processData.temperature[i] - 300) / 100) * chartHeight;
+          
+          if (i === 0) tempCompCtx.moveTo(x, y);
+          else tempCompCtx.lineTo(x, y);
+        }
+        tempCompCtx.stroke();
+      }
+      
+      // Draw composition curve (blue)
+      if (processData.composition.length > 1) {
+        tempCompCtx.strokeStyle = '#4444ff';
+        tempCompCtx.lineWidth = 2;
+        tempCompCtx.beginPath();
+        
+        for (let i = 0; i < processData.composition.length; i++) {
+          const x = margin + (i / (processData.composition.length - 1)) * chartWidth;
+          const y = tempCompCanvas.height - margin - processData.composition[i] * chartHeight;
+          
+          if (i === 0) tempCompCtx.moveTo(x, y);
+          else tempCompCtx.lineTo(x, y);
+        }
+        tempCompCtx.stroke();
+      }
+      
+      // Draw labels
+      tempCompCtx.fillStyle = '#fff';
+      tempCompCtx.font = '12px Arial';
+      tempCompCtx.fillText('Temperature (°C)', 10, 20);
+      tempCompCtx.fillStyle = '#ff4444';
+      tempCompCtx.fillRect(120, 12, 15, 3);
+      
+      tempCompCtx.fillStyle = '#fff';
+      tempCompCtx.fillText('Composition', 150, 20);
+      tempCompCtx.fillStyle = '#4444ff';
+      tempCompCtx.fillRect(220, 12, 15, 3);
+    }
+
+    function drawPressureChart() {
+      pressureCtx.clearRect(0, 0, pressureCanvas.width, pressureCanvas.height);
+      
+      if (processData.time.length === 0) return;
+      
+      const margin = 40;
+      const chartWidth = pressureCanvas.width - 2 * margin;
+      const chartHeight = pressureCanvas.height - 2 * margin;
+      
+      // Draw axes
+      pressureCtx.strokeStyle = '#fff';
+      pressureCtx.lineWidth = 1;
+      pressureCtx.beginPath();
+      pressureCtx.moveTo(margin, margin);
+      pressureCtx.lineTo(margin, pressureCanvas.height - margin);
+      pressureCtx.lineTo(pressureCanvas.width - margin, pressureCanvas.height - margin);
+      pressureCtx.stroke();
+      
+      // Draw pressure curve (green)
+      if (processData.pressure.length > 1) {
+        pressureCtx.strokeStyle = '#44ff44';
+        pressureCtx.lineWidth = 3;
+        pressureCtx.beginPath();
+        
+        for (let i = 0; i < processData.pressure.length; i++) {
+          const x = margin + (i / (processData.pressure.length - 1)) * chartWidth;
+          const y = pressureCanvas.height - margin - ((processData.pressure[i] - 1) / 3) * chartHeight;
+          
+          if (i === 0) pressureCtx.moveTo(x, y);
+          else pressureCtx.lineTo(x, y);
+        }
+        pressureCtx.stroke();
+      }
+      
+      // Draw labels
+      pressureCtx.fillStyle = '#fff';
+      pressureCtx.font = '12px Arial';
+      pressureCtx.fillText('Pressure (bar)', 10, 20);
+      pressureCtx.fillStyle = '#44ff44';
+      pressureCtx.fillRect(100, 12, 15, 3);
+    }
+
     const loader = new GLTFLoader();
     loader.load('digital_twin.glb', function(gltf) {
       gltf.scene.traverse(function(child) {
         if (child.isMesh) {
           child.material = new THREE.MeshStandardMaterial({
-            color: 0x8C92AC, // Steel blue-gray color
+            color: 0x8C92AC,
             metalness: 0.9,
             roughness: 0.1
           });
