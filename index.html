@@ -16,6 +16,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.153.0/examples/jsm/controls/OrbitControls.js';
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -23,16 +24,47 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7.5);
-    scene.add(light);
+    // Add orbit controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI;
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+    mainLight.position.set(5, 10, 7.5);
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight.position.set(-5, 5, -5);
+    scene.add(fillLight);
+
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
+    scene.add(ambientLight);
 
     const loader = new GLTFLoader();
     loader.load('digital_twin.glb', function(gltf) {
+      gltf.scene.traverse(function(child) {
+        if (child.isMesh) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: 0x8C92AC, // Steel blue-gray color
+            metalness: 0.9,
+            roughness: 0.1
+          });
+        }
+      });
       scene.add(gltf.scene);
-      camera.position.set(0, -5, 3);
+      camera.position.set(0, 7, 15);
       camera.lookAt(0, 0, 1);
-      renderer.setAnimationLoop(() => renderer.render(scene, camera));
+      
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
     });
   </script>
 </body>
