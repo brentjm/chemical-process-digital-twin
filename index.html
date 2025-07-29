@@ -148,6 +148,13 @@
       startBtn.className = 'stop';
       drawer.classList.add('open');
       
+      // Change PFR color to metallic green when process starts
+      if (window.processEquipment && window.processEquipment['pfr']) {
+        window.processEquipment['pfr'].material.color.setHex(0x00ff44); // Green
+        window.processEquipment['pfr'].material.metalness = 0.9;
+        window.processEquipment['pfr'].material.roughness = 0.1;
+      }
+      
       // Reset data
       processData.temperature = [];
       processData.composition = [];
@@ -164,11 +171,18 @@
       startBtn.className = 'start';
       drawer.classList.remove('open');
       
+      // Change PFR color to metallic red when process stops
+      if (window.processEquipment && window.processEquipment['pfr']) {
+        window.processEquipment['pfr'].material.color.setHex(0xff4444); // Red
+        window.processEquipment['pfr'].material.metalness = 0.9;
+        window.processEquipment['pfr'].material.roughness = 0.1;
+      }
+      
       if (dataInterval) {
         clearInterval(dataInterval);
       }
     }
-
+    
     function generateData() {
       const currentTime = processData.time.length;
       
@@ -301,8 +315,17 @@
 
     const loader = new GLTFLoader();
     loader.load('digital_twin.glb', function(gltf) {
+      // Store references to specific equipment
+      const equipment = {};
+      
       gltf.scene.traverse(function(child) {
         if (child.isMesh) {
+          // Debug: Log all mesh names found
+          console.log('Found mesh:', child.name);
+          
+          // Store mesh by its Blender name
+          equipment[child.name] = child;
+          
           child.material = new THREE.MeshStandardMaterial({
             color: 0x8C92AC,
             metalness: 0.9,
@@ -310,6 +333,20 @@
           });
         }
       });
+      
+      // Debug: Log all available equipment
+      console.log('Available equipment:', Object.keys(equipment));
+      
+      // Make equipment accessible globally
+      window.processEquipment = equipment;
+      
+      // Set PFR to red metallic on first load
+      if (equipment['pfr']) {
+        equipment['pfr'].material.color.setHex(0xff4444); // Red
+        equipment['pfr'].material.metalness = 0.9;
+        equipment['pfr'].material.roughness = 0.1;
+      }
+  
       scene.add(gltf.scene);
       camera.position.set(0, 7, 15);
       camera.lookAt(0, 0, 1);
@@ -321,6 +358,7 @@
       }
       animate();
     });
+
   </script>
 </body>
 </html>
