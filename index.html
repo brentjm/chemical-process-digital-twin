@@ -327,7 +327,7 @@
           equipment[child.name] = child;
           
           child.material = new THREE.MeshStandardMaterial({
-            color: 0x8C92AC,
+            color: 0xe0e0e0,
             metalness: 0.9,
             roughness: 0.1
           });
@@ -340,11 +340,59 @@
       // Make equipment accessible globally
       window.processEquipment = equipment;
       
+      // Add raycaster and mouse for hover detection
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      const popover = document.createElement('div');
+
+      // Style the popover
+      popover.style.position = 'absolute';
+      popover.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Semi-translucent dark gray
+      popover.style.color = 'white';
+      popover.style.padding = '15px'; // Increased padding for a larger rectangle
+      popover.style.borderRadius = '8px'; // Slightly larger border radius
+      popover.style.border = '2px solid #fff'; // White border
+      popover.style.pointerEvents = 'none';
+      popover.style.display = 'none';
+      popover.style.width = '600px'; // Fixed width for a larger rectangle
+      popover.style.height = '300px'; // Fixed width for a larger rectangle
+      popover.style.textAlign = 'center'; // Center-align text
+      document.body.appendChild(popover);
+
+      // Mouse move event listener
+      window.addEventListener('mousemove', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        // Update raycaster
+        raycaster.setFromCamera(mouse, camera);
+
+        // Check for intersections
+        const intersects = raycaster.intersectObjects(Object.values(window.processEquipment || {}));
+        if (intersects.length > 0 && ['pfr', 'cstr', 'tank', 'vessel'].some(name => intersects[0].object.name.includes(name))) {
+          const intersect = intersects[0];
+          popover.style.left = `${event.clientX + 10}px`;
+          popover.style.top = `${event.clientY + 10}px`;
+          popover.style.display = 'block';
+          popover.textContent = `Equipment: ${intersect.object.name}`;
+        }
+        else {
+          popover.style.display = 'none';
+        }
+      });
+
       // Set PFR to red metallic on first load
       if (equipment['pfr']) {
         equipment['pfr'].material.color.setHex(0xff4444); // Red
         equipment['pfr'].material.metalness = 0.9;
         equipment['pfr'].material.roughness = 0.1;
+      }
+  
+      // Set Company logo to blue metallic on first load
+      if (equipment['nalas']) {
+        equipment['nalas'].material.color.setHex(0x25bcf7); // Blue
+        equipment['nalas'].material.metalness = 0.9;
+        equipment['nalas'].material.roughness = 0.1;
       }
   
       scene.add(gltf.scene);
